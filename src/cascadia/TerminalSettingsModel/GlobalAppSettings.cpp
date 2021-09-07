@@ -58,17 +58,6 @@ static constexpr std::string_view SoftwareRenderingKey{ "experimental.rendering.
 static constexpr std::string_view ForceVTInputKey{ "experimental.input.forceVT" };
 static constexpr std::string_view DetectURLsKey{ "experimental.detectURLs" };
 
-#ifdef _DEBUG
-static constexpr bool debugFeaturesDefault{ true };
-#else
-static constexpr bool debugFeaturesDefault{ false };
-#endif
-
-bool GlobalAppSettings::_getDefaultDebugFeaturesValue()
-{
-    return debugFeaturesDefault;
-}
-
 // Method Description:
 // - Copies any extraneous data from the parent before completing a CreateChild call
 // Arguments:
@@ -127,9 +116,8 @@ winrt::com_ptr<GlobalAppSettings> GlobalAppSettings::Copy() const
     globals->_MinimizeToTray = _MinimizeToTray;
     globals->_AlwaysShowTrayIcon = _AlwaysShowTrayIcon;
     globals->_DisabledProfileSources = _DisabledProfileSources;
-
     globals->_UnparsedDefaultProfile = _UnparsedDefaultProfile;
-    globals->_validDefaultProfile = _validDefaultProfile;
+
     globals->_defaultProfile = _defaultProfile;
     globals->_actionMap = _actionMap->Copy();
     globals->_keybindingsWarnings = _keybindingsWarnings;
@@ -142,7 +130,7 @@ winrt::com_ptr<GlobalAppSettings> GlobalAppSettings::Copy() const
             globals->_colorSchemes.Insert(kv.Key(), *schemeImpl->Copy());
         }
     }
-    
+
     for (const auto& parent : _parents)
     {
         globals->InsertParent(parent->Copy());
@@ -156,69 +144,18 @@ winrt::Windows::Foundation::Collections::IMapView<winrt::hstring, winrt::Microso
 }
 
 #pragma region DefaultProfile
+
 void GlobalAppSettings::DefaultProfile(const winrt::guid& defaultProfile) noexcept
 {
-    _validDefaultProfile = true;
     _defaultProfile = defaultProfile;
     _UnparsedDefaultProfile = Utils::GuidToString(defaultProfile);
 }
 
 winrt::guid GlobalAppSettings::DefaultProfile() const
 {
-    // If we have an unresolved default profile, we should likely explode.
-    THROW_HR_IF(E_INVALIDARG, !_validDefaultProfile);
     return _defaultProfile;
 }
 
-bool GlobalAppSettings::HasUnparsedDefaultProfile() const
-{
-    return _UnparsedDefaultProfile.has_value();
-}
-
-winrt::hstring GlobalAppSettings::UnparsedDefaultProfile() const
-{
-    const auto val{ _getUnparsedDefaultProfileImpl() };
-    return val ? *val : hstring{ L"" };
-}
-
-void GlobalAppSettings::UnparsedDefaultProfile(const hstring& value)
-{
-    if (_UnparsedDefaultProfile != value)
-    {
-        _UnparsedDefaultProfile = value;
-        _validDefaultProfile = false;
-    }
-}
-
-void GlobalAppSettings::ClearUnparsedDefaultProfile()
-{
-    if (HasUnparsedDefaultProfile())
-    {
-        _UnparsedDefaultProfile = std::nullopt;
-    }
-}
-
-std::optional<winrt::hstring> GlobalAppSettings::_getUnparsedDefaultProfileImpl() const
-{
-    /*return user set value*/
-    if (_UnparsedDefaultProfile)
-    {
-        return _UnparsedDefaultProfile;
-    }
-
-    /*user set value was not set*/
-    /*iterate through parents to find a value*/
-    for (const auto& parent : _parents)
-    {
-        if (auto val{ parent->_getUnparsedDefaultProfileImpl() })
-        {
-            return val;
-        }
-    }
-
-    /*no value was found*/
-    return std::nullopt;
-}
 #pragma endregion
 
 winrt::Microsoft::Terminal::Settings::Model::ActionMap GlobalAppSettings::ActionMap() const noexcept
@@ -241,10 +178,6 @@ winrt::com_ptr<GlobalAppSettings> GlobalAppSettings::FromJson(const Json::Value&
 
 void GlobalAppSettings::LayerJson(const Json::Value& json)
 {
-    // _validDefaultProfile keeps track of whether we've verified that DefaultProfile points to something
-    // CascadiaSettings::_ResolveDefaultProfile performs a validation and updates DefaultProfile() with the
-    // resolved value, then making it valid.
-    _validDefaultProfile = false;
     JsonUtils::GetValueForKey(json, DefaultProfileKey, _UnparsedDefaultProfile);
     JsonUtils::GetValueForKey(json, AlwaysShowTabsKey, _AlwaysShowTabs);
     JsonUtils::GetValueForKey(json, ConfirmCloseAllKey, _ConfirmCloseAllTabs);

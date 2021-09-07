@@ -26,12 +26,6 @@ namespace TerminalAppUnitTests
             TEST_CLASS_PROPERTY(L"ActivationContext", L"TerminalApp.Unit.Tests.manifest")
         END_TEST_CLASS()
 
-        TEST_CLASS_SETUP(ClassSetup)
-        {
-            InitializeJsonReader();
-            return true;
-        }
-
         TEST_METHOD(TestSimpleGenerate);
 
         // Simple test of CascadiaSettings generating profiles with _LoadDynamicProfiles

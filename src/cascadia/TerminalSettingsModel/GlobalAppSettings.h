@@ -50,14 +50,10 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 
         const std::vector<SettingsLoadWarnings>& KeybindingsWarnings() const;
 
-        // These are implemented manually to handle the string/GUID exchange
-        // by higher layers in the app.
+        // DefaultProfile is set by parsing UnparsedDefaultProfile
+        // during deserzialization in CascadiaSettings.
         void DefaultProfile(const guid& defaultProfile) noexcept;
         guid DefaultProfile() const;
-        bool HasUnparsedDefaultProfile() const;
-        winrt::hstring UnparsedDefaultProfile() const;
-        void UnparsedDefaultProfile(const hstring& value);
-        void ClearUnparsedDefaultProfile();
 
         // TODO GH#9207: Remove this once we have a GlobalAppSettingsViewModel in TerminalSettingsEditor
         void SetInvertedDisableAnimationsValue(bool invertedDisableAnimationsValue)
@@ -88,7 +84,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         INHERITABLE_SETTING(Model::GlobalAppSettings, bool, ForceFullRepaintRendering, false);
         INHERITABLE_SETTING(Model::GlobalAppSettings, bool, SoftwareRendering, false);
         INHERITABLE_SETTING(Model::GlobalAppSettings, bool, ForceVTInput, false);
-        INHERITABLE_SETTING(Model::GlobalAppSettings, bool, DebugFeaturesEnabled, _getDefaultDebugFeaturesValue());
+        INHERITABLE_SETTING(Model::GlobalAppSettings, bool, DebugFeaturesEnabled, debugFeaturesDefault);
         INHERITABLE_SETTING(Model::GlobalAppSettings, bool, StartOnUserLogin, false);
         INHERITABLE_SETTING(Model::GlobalAppSettings, bool, AlwaysOnTop, false);
         INHERITABLE_SETTING(Model::GlobalAppSettings, Model::TabSwitcherMode, TabSwitcherMode, Model::TabSwitcherMode::InOrder);
@@ -101,21 +97,18 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         INHERITABLE_SETTING(Model::GlobalAppSettings, bool, MinimizeToTray, false);
         INHERITABLE_SETTING(Model::GlobalAppSettings, bool, AlwaysShowTrayIcon, false);
         INHERITABLE_SETTING(Model::GlobalAppSettings, winrt::Windows::Foundation::Collections::IVector<winrt::hstring>, DisabledProfileSources, nullptr);
+        INHERITABLE_SETTING(Model::GlobalAppSettings, hstring, UnparsedDefaultProfile, L"");
 
     private:
-        winrt::guid _defaultProfile;
-        std::optional<hstring> _UnparsedDefaultProfile;
-        bool _validDefaultProfile = false;
+#ifdef NDEBUG
+        static constexpr bool debugFeaturesDefault{ false };
+#else
+        static constexpr bool debugFeaturesDefault{ true };
+#endif
 
+        winrt::guid _defaultProfile;
         winrt::com_ptr<implementation::ActionMap> _actionMap{ winrt::make_self<implementation::ActionMap>() };
         std::vector<SettingsLoadWarnings> _keybindingsWarnings;
-
         Windows::Foundation::Collections::IMap<winrt::hstring, Model::ColorScheme> _colorSchemes{ winrt::single_threaded_map<winrt::hstring, Model::ColorScheme>() };
-
-        std::optional<hstring> _getUnparsedDefaultProfileImpl() const;
-        static bool _getDefaultDebugFeaturesValue();
-
-        friend class SettingsModelLocalTests::DeserializationTests;
-        friend class SettingsModelLocalTests::ColorSchemeTests;
     };
 }

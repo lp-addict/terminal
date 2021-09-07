@@ -36,12 +36,6 @@ namespace SettingsModelLocalTests
         TEST_METHOD(LayerColorSchemeProperties);
         TEST_METHOD(LayerColorSchemesOnArray);
         TEST_METHOD(UpdateSchemeReferences);
-
-        TEST_CLASS_SETUP(ClassSetup)
-        {
-            InitializeJsonReader();
-            return true;
-        }
     };
 
     void ColorSchemeTests::CanLayerColorScheme()
@@ -186,7 +180,7 @@ namespace SettingsModelLocalTests
             "background": "#070707"
         })" };
 
-        const auto settings = winrt::make_self<CascadiaSettings>(scheme0String, scheme1String);
+        const auto settings = winrt::make_self<CascadiaSettings>(scheme1String, scheme0String);
 
         VERIFY_ARE_EQUAL(3u, settings->_globals->ColorSchemes().Size());
 

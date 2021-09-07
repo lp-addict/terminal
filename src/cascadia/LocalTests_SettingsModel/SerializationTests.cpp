@@ -42,13 +42,6 @@ namespace SettingsModelLocalTests
         TEST_METHOD(CascadiaSettings);
         TEST_METHOD(LegacyFontSettings);
 
-        TEST_CLASS_SETUP(ClassSetup)
-        {
-            InitializeJsonReader();
-            InitializeJsonWriter();
-            return true;
-        }
-
     private:
         // Method Description:
         // - deserializes and reserializes a json string representing a settings object model of type T
@@ -304,10 +297,10 @@ namespace SettingsModelLocalTests
                                             ])" };
         const std::string actionsString9B{ R"([
                                                 {
-                                                    "commands": 
+                                                    "commands":
                                                     [
                                                         {
-                                                            "command": 
+                                                            "command":
                                                             {
                                                                 "action": "sendInput",
                                                                 "input": "${profile.name}"
@@ -320,13 +313,13 @@ namespace SettingsModelLocalTests
                                         ])" };
         const std::string actionsString9C{ R""([
                                                 {
-                                                    "commands": 
+                                                    "commands":
                                                     [
                                                         {
-                                                            "commands": 
+                                                            "commands":
                                                             [
                                                                 {
-                                                                    "command": 
+                                                                    "command":
                                                                     {
                                                                         "action": "sendInput",
                                                                         "input": "${profile.name} ${scheme.name}"
@@ -343,7 +336,7 @@ namespace SettingsModelLocalTests
                                             ])"" };
         const std::string actionsString9D{ R""([
                                                 {
-                                                    "command": 
+                                                    "command":
                                                     {
                                                         "action": "newTab",
                                                         "profile": "${profile.name}"

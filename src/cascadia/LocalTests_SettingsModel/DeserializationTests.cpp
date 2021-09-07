@@ -73,12 +73,6 @@ namespace SettingsModelLocalTests
         TEST_METHOD(TestValidDefaults);
         TEST_METHOD(TestInheritedCommand);
 
-        TEST_CLASS_SETUP(ClassSetup)
-        {
-            InitializeJsonReader();
-            return true;
-        }
-
     private:
         void _logCommandNames(winrt::Windows::Foundation::Collections::IMapView<winrt::hstring, Command> commands, const int indentation = 1)
         {
@@ -357,7 +351,7 @@ namespace SettingsModelLocalTests
             "initialRows" : 60
         })" };
 
-        const auto settings = winrt::make_self<implementation::CascadiaSettings>(settings0String, settings1String);
+        const auto settings = winrt::make_self<implementation::CascadiaSettings>(settings1String, settings0String);
         VERIFY_ARE_EQUAL(true, settings->GlobalSettings().AlwaysShowTabs());
         VERIFY_ARE_EQUAL(240, settings->GlobalSettings().InitialCols());
         VERIFY_ARE_EQUAL(60, settings->GlobalSettings().InitialRows());
@@ -413,7 +407,7 @@ namespace SettingsModelLocalTests
                 L"Case 1: Simple swapping of the ordering. The user has the "
                 L"default profiles in the opposite order of the default ordering."));
 
-            const auto settings = winrt::make_self<implementation::CascadiaSettings>(defaultProfilesString, userProfiles0String);
+            const auto settings = winrt::make_self<implementation::CascadiaSettings>(userProfiles0String, defaultProfilesString);
             VERIFY_ARE_EQUAL(2u, settings->AllProfiles().Size());
             VERIFY_ARE_EQUAL(L"profile0", settings->AllProfiles().GetAt(0).Name());
             VERIFY_ARE_EQUAL(L"profile1", settings->AllProfiles().GetAt(1).Name());
@@ -423,7 +417,7 @@ namespace SettingsModelLocalTests
             Log::Comment(NoThrowString().Format(
                 L"Case 2: Make sure all the user's profiles appear before the defaults."));
 
-            const auto settings = winrt::make_self<implementation::CascadiaSettings>(defaultProfilesString, userProfiles1String);
+            const auto settings = winrt::make_self<implementation::CascadiaSettings>(userProfiles1String, defaultProfilesString);
             VERIFY_ARE_EQUAL(3u, settings->AllProfiles().Size());
             VERIFY_ARE_EQUAL(L"profile4", settings->AllProfiles().GetAt(0).Name());
             VERIFY_ARE_EQUAL(L"profile5", settings->AllProfiles().GetAt(1).Name());
@@ -483,7 +477,7 @@ namespace SettingsModelLocalTests
         })" };
 
         {
-            const auto settings = winrt::make_self<implementation::CascadiaSettings>(defaultProfilesString, userProfiles0String);
+            const auto settings = winrt::make_self<implementation::CascadiaSettings>(userProfiles0String, defaultProfilesString);
             VERIFY_ARE_EQUAL(2u, settings->AllProfiles().Size());
             VERIFY_ARE_EQUAL(1u, settings->_activeProfiles.Size());
             VERIFY_ARE_EQUAL(L"profile1", settings->_activeProfiles.GetAt(0).Name());
@@ -491,7 +485,7 @@ namespace SettingsModelLocalTests
         }
 
         {
-            const auto settings = winrt::make_self<implementation::CascadiaSettings>(defaultProfilesString, userProfiles1String);
+            const auto settings = winrt::make_self<implementation::CascadiaSettings>(userProfiles1String, defaultProfilesString);
             VERIFY_ARE_EQUAL(4u, settings->AllProfiles().Size());
             VERIFY_ARE_EQUAL(2u, settings->_activeProfiles.Size());
             VERIFY_ARE_EQUAL(L"profile5", settings->_activeProfiles.GetAt(0).Name());
@@ -645,7 +639,7 @@ namespace SettingsModelLocalTests
             ]
         })" };
 
-        const auto settings = winrt::make_self<implementation::CascadiaSettings>(DefaultJson, settings0String);
+        const auto settings = winrt::make_self<implementation::CascadiaSettings>(settings0String, DefaultJson);
 
         VERIFY_ARE_EQUAL(0u, settings->Warnings().Size());
         VERIFY_ARE_EQUAL(4u, settings->AllProfiles().Size());
@@ -723,7 +717,7 @@ namespace SettingsModelLocalTests
             ]
         })" };
 
-        const auto settings = winrt::make_self<implementation::CascadiaSettings>(DefaultJson, settings0String);
+        const auto settings = winrt::make_self<implementation::CascadiaSettings>(settings0String, DefaultJson);
 
         VERIFY_ARE_EQUAL(0u, settings->Warnings().Size());
         VERIFY_ARE_EQUAL(4u, settings->AllProfiles().Size());
@@ -761,7 +755,7 @@ namespace SettingsModelLocalTests
             ]
         })" };
 
-        const auto settings = winrt::make_self<implementation::CascadiaSettings>(DefaultJson, settings0String);
+        const auto settings = winrt::make_self<implementation::CascadiaSettings>(settings0String, DefaultJson);
 
         VERIFY_ARE_EQUAL(5u, settings->AllProfiles().Size());
         VERIFY_IS_TRUE(settings->AllProfiles().GetAt(0).HasGuid());
@@ -1206,7 +1200,7 @@ namespace SettingsModelLocalTests
         const auto guid1String = L"{6239a42c-1111-49a3-80bd-e8fdd045185c}";
         const winrt::guid guid1{ Utils::GuidFromString(guid1String) };
 
-        const auto settings = winrt::make_self<implementation::CascadiaSettings>(DefaultJson, settings0String);
+        const auto settings = winrt::make_self<implementation::CascadiaSettings>(settings0String, DefaultJson);
 
         VERIFY_ARE_EQUAL(guid1String, settings->GlobalSettings().UnparsedDefaultProfile());
         VERIFY_ARE_EQUAL(4u, settings->AllProfiles().Size());
@@ -1277,13 +1271,13 @@ namespace SettingsModelLocalTests
                 ]
             }
         })" };
-        
-        const auto settings = winrt::make_self<implementation::CascadiaSettings>(dynamicProfiles, userProfiles);
+
+        const auto settings = winrt::make_self<implementation::CascadiaSettings>(userProfiles, dynamicProfiles);
 
         Log::Comment(NoThrowString().Format(
             L"All profiles with the same name have the same GUID. However, they"
             L" will not be layered, because they have different source's"));
-        
+
         VERIFY_IS_FALSE(settings->AllProfiles().GetAt(0).Source().empty());
         VERIFY_IS_FALSE(settings->AllProfiles().GetAt(1).Source().empty());
         VERIFY_IS_FALSE(settings->AllProfiles().GetAt(2).Source().empty());
@@ -1372,7 +1366,7 @@ namespace SettingsModelLocalTests
                 { "name": "invalid nested", "commands":[ { "name" : "hello" }, { "name" : "world" } ] }
             ]
         })" };
-        
+
         const auto settings = winrt::make_self<implementation::CascadiaSettings>(badSettings);
 
         // KeyMap: ctrl+a/b are mapped to "invalid"
@@ -1418,7 +1412,7 @@ namespace SettingsModelLocalTests
                 { "name":null, "command": { "action": "wt", "commandline":null }, "keys": [ "ctrl+c" ] }
             ]
         })" };
-        
+
         const auto settings = winrt::make_self<implementation::CascadiaSettings>(badSettings);
 
         VERIFY_ARE_EQUAL(3u, settings->GlobalSettings().ActionMap().AvailableActions().Size());
@@ -1772,7 +1766,7 @@ namespace SettingsModelLocalTests
             ],
         })" };
 
-        const auto settings = winrt::make_self<implementation::CascadiaSettings>(settingsJson, settings1Json);
+        const auto settings = winrt::make_self<implementation::CascadiaSettings>(settings1Json, settingsJson);
         VERIFY_ARE_EQUAL(3u, settings->AllProfiles().Size());
         VERIFY_ARE_EQUAL(0u, settings->Warnings().Size());
         VERIFY_ARE_EQUAL(0u, settings->ActionMap().NameMap().Size());
@@ -1834,7 +1828,7 @@ namespace SettingsModelLocalTests
             ],
         })" };
 
-        const auto settings = winrt::make_self<implementation::CascadiaSettings>(settingsJson, settings1Json);
+        const auto settings = winrt::make_self<implementation::CascadiaSettings>(settings1Json, settingsJson);
 
         const auto nameMap = settings->ActionMap().NameMap();
         _logCommandNames(nameMap);
@@ -2112,7 +2106,7 @@ namespace SettingsModelLocalTests
             ],
         })" };
 
-        const auto settings = winrt::make_self<implementation::CascadiaSettings>(settings1Json, settings2Json);
+        const auto settings = winrt::make_self<implementation::CascadiaSettings>(settings2Json, settings1Json);
         const KeyChord expectedKeyChord{ true, false, true, false, static_cast<int>('W'), 0 };
 
         const auto nameMap = settings->ActionMap().NameMap();

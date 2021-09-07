@@ -15,64 +15,15 @@ using namespace winrt::Microsoft::Terminal::Control;
 using namespace winrt::Windows::Foundation::Collections;
 using namespace Microsoft::Console;
 
-winrt::com_ptr<Profile> winrt::Microsoft::Terminal::Settings::Model::implementation::ReproduceProfile(const winrt::com_ptr<Profile>& parent)
+winrt::com_ptr<Profile> Model::implementation::ReproduceProfile(const winrt::com_ptr<Profile>& parent)
 {
     const auto profile = winrt::make_self<Profile>();
     profile->Origin(OriginTag::User);
     profile->Name(parent->Name());
     profile->Guid(parent->Guid());
     profile->Hidden(parent->Hidden());
-    profile->Source(parent->Source());
     profile->InsertParent(parent);
     return profile;
-}
-
-CascadiaSettings::CascadiaSettings(const winrt::hstring& inboxJSON, const winrt::hstring& userJSON) :
-    CascadiaSettings(SettingsLoader::Default(til::u16u8(inboxJSON), til::u16u8(userJSON)))
-{
-}
-
-CascadiaSettings::CascadiaSettings(const std::string_view& inboxJSON, const std::string_view& userJSON) :
-    CascadiaSettings(SettingsLoader::Default(inboxJSON, userJSON))
-{
-}
-
-CascadiaSettings::CascadiaSettings(SettingsLoader&& loader)
-{
-    loader._finalizeLayering();
-
-    std::vector<Model::Profile> allProfiles;
-    std::vector<Model::Profile> activeProfiles;
-
-    allProfiles.reserve(loader.userSettings.profiles.size());
-    activeProfiles.reserve(loader.userSettings.profiles.size());
-
-    for (const auto& profile : loader.userSettings.profiles)
-    {
-        allProfiles.emplace_back(*profile);
-        if (!profile->Hidden())
-        {
-            activeProfiles.emplace_back(*profile);
-        }
-    }
-
-    if (allProfiles.empty())
-    {
-        throw SettingsException(SettingsLoadErrors::NoProfiles);
-    }
-    if (activeProfiles.empty())
-    {
-        throw SettingsException(SettingsLoadErrors::AllProfilesHidden);
-    }
-
-    _globals = loader.userSettings.globals;
-    _baseLayerProfile = loader.userSettings.baseLayerProfile;
-    _allProfiles = winrt::single_threaded_observable_vector(std::move(allProfiles));
-    _activeProfiles = winrt::single_threaded_observable_vector(std::move(activeProfiles));
-    _warnings = winrt::single_threaded_vector(std::move(loader.warnings));
-
-    _finalizeSettings();
-    _validateSettings();
 }
 
 Model::CascadiaSettings CascadiaSettings::Copy() const
@@ -436,7 +387,6 @@ winrt::com_ptr<Profile> CascadiaSettings::_createNewProfile(const std::wstring_v
 // - <none>
 void CascadiaSettings::_validateSettings()
 {
-    _validateDefaultProfileExists();
     _validateAllSchemesExist();
     _validateMediaResources();
     _validateKeybindings();
@@ -450,40 +400,16 @@ void CascadiaSettings::_finalizeSettings() const
 {
     if (const auto unparsedDefaultProfile = _globals->UnparsedDefaultProfile(); !unparsedDefaultProfile.empty())
     {
-        _globals->DefaultProfile(_getProfileGuidByName(unparsedDefaultProfile).value_or(guid{}));
-    }
-}
-
-// Method Description:
-// - Checks if the "defaultProfile" is set to one of the profiles we
-//   actually have. If the value is unset, or the value is set to something that
-//   doesn't exist in the list of profiles, we'll arbitrarily pick the first
-//   profile to use temporarily as the default.
-// - Appends a SettingsLoadWarnings::MissingDefaultProfile to our list of
-//   warnings if we failed to find the default.
-void CascadiaSettings::_validateDefaultProfileExists()
-{
-    const auto defaultProfileGuid = GlobalSettings().DefaultProfile();
-    const bool nullDefaultProfile = defaultProfileGuid == winrt::guid{};
-    bool defaultProfileNotInProfiles = true;
-    for (const auto& profile : _allProfiles)
-    {
-        if (profile.Guid() == defaultProfileGuid)
+        if (const auto guid = _getProfileGuidByName(unparsedDefaultProfile))
         {
-            defaultProfileNotInProfiles = false;
-            break;
+            _globals->DefaultProfile(*guid);
+            return;
         }
     }
 
-    if (nullDefaultProfile || defaultProfileNotInProfiles)
-    {
-        _warnings.Append(SettingsLoadWarnings::MissingDefaultProfile);
-        // Use the first profile as the new default
-
-        // _temporarily_ set the default profile to the first profile. Because
-        // we're adding a warning, this settings change won't be re-serialized.
-        GlobalSettings().DefaultProfile(_allProfiles.GetAt(0).Guid());
-    }
+    // Use the first profile as the new default.
+    GlobalSettings().DefaultProfile(_allProfiles.GetAt(0).Guid());
+    _warnings.Append(SettingsLoadWarnings::MissingDefaultProfile);
 }
 
 // Method Description:
@@ -554,7 +480,7 @@ void CascadiaSettings::_validateMediaResources()
             catch (...)
             {
                 // reset background image path
-                profile.DefaultAppearance().BackgroundImagePath(L"");
+                profile.DefaultAppearance().ClearBackgroundImagePath();
                 invalidBackground = true;
             }
         }
@@ -572,7 +498,7 @@ void CascadiaSettings::_validateMediaResources()
                 catch (...)
                 {
                     // reset background image path
-                    profile.UnfocusedAppearance().BackgroundImagePath(L"");
+                    profile.UnfocusedAppearance().ClearBackgroundImagePath();
                     invalidBackground = true;
                 }
             }

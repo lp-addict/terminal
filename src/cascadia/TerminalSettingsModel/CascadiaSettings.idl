@@ -19,7 +19,7 @@ namespace Microsoft.Terminal.Settings.Model
         static String ApplicationDisplayName { get; };
         static String ApplicationVersion { get; };
         
-        CascadiaSettings(String inboxJSON, String userJSON);
+        CascadiaSettings(String userJSON, String inboxJSON);
 
         CascadiaSettings Copy();
         void WriteSettingsToDisk();

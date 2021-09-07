@@ -93,15 +93,21 @@ std::filesystem::path buildPath(const std::wstring_view& lhs, const std::wstring
     return { std::move(buffer) };
 }
 
-SettingsLoader::SettingsLoader(const std::string_view& inboxJSON, const std::string_view& userJSON)
+SettingsLoader SettingsLoader::Default(const std::string_view& userJSON, const std::string_view& inboxJSON)
 {
-    Expects(!inboxJSON.empty());
+    SettingsLoader loader{ userJSON, inboxJSON };
+    loader.MergeInboxIntoUserProfiles();
+    loader.FinalizeLayering();
+    return loader;
+}
+
+SettingsLoader::SettingsLoader(const std::string_view& userJSON, const std::string_view& inboxJSON)
+{
     _parse(OriginTag::InBox, inboxJSON, inboxSettings);
 
     try
     {
-        static constexpr std::string_view emptySettings{ "{}" };
-        _parse(OriginTag::User, userJSON.empty() ? emptySettings : userJSON, userSettings);
+        _parse(OriginTag::User, userJSON, userSettings);
     }
     catch (const JsonUtils::DeserializationError& e)
     {
@@ -324,7 +330,7 @@ void SettingsLoader::DisableDeletedProfiles()
     }
 }
 
-void SettingsLoader::_finalizeLayering()
+void SettingsLoader::FinalizeLayering()
 {
     // Layer default globals -> user globals
     userSettings.globals->InsertParent(inboxSettings.globals);
@@ -428,7 +434,9 @@ bool SettingsLoader::_isValidProfileObject(const Json::Value& profileJson)
 
 void SettingsLoader::_parse(const OriginTag origin, const std::string_view& content, ParsedSettings& settings)
 {
-    const auto json = _parseJSON(content);
+    static constexpr std::string_view emptyObjectJSON{ "{}" };
+
+    const auto json = _parseJSON(content.empty() ? emptyObjectJSON : content);
     const auto& profilesObject = _getJSONValue(json, ProfilesKey);
     const auto& defaultsObject = _getJSONValue(profilesObject, DefaultSettingsKey);
     const auto& profilesArray = profilesObject.isArray() ? profilesObject : _getJSONValue(profilesObject, ProfilesListKey);
@@ -536,6 +544,7 @@ try
     // --> MergeFragmentsIntoUserProfiles is called after MergeInboxIntoUserProfiles.
     loader.MergeFragmentsIntoUserProfiles();
     loader.DisableDeletedProfiles();
+    loader.FinalizeLayering();
 
     // If this throws, the app will catch it and use the default settings.
     const auto settings = winrt::make_self<CascadiaSettings>(std::move(loader));
@@ -578,7 +587,7 @@ catch (const SettingsTypedDeserializationException& e)
 // - a unique_ptr to a CascadiaSettings with the connection types and settings for Universal terminal
 Model::CascadiaSettings CascadiaSettings::LoadUniversal()
 {
-    return *winrt::make_self<CascadiaSettings>(DefaultUniversalJson);
+    return *winrt::make_self<CascadiaSettings>(std::string_view{}, DefaultUniversalJson);
 }
 
 // Function Description:
@@ -590,7 +599,58 @@ Model::CascadiaSettings CascadiaSettings::LoadUniversal()
 // - a unique_ptr to a CascadiaSettings with the settings from defaults.json
 Model::CascadiaSettings CascadiaSettings::LoadDefaults()
 {
-    return *winrt::make_self<CascadiaSettings>(DefaultJson);
+    return *winrt::make_self<CascadiaSettings>(std::string_view{}, DefaultJson);
+}
+
+CascadiaSettings::CascadiaSettings(const winrt::hstring& userJSON, const winrt::hstring& inboxJSON) :
+    CascadiaSettings{ SettingsLoader::Default(til::u16u8(userJSON), til::u16u8(inboxJSON)) }
+{
+}
+
+CascadiaSettings::CascadiaSettings(const std::string_view& userJSON, const std::string_view& inboxJSON) :
+    CascadiaSettings{ SettingsLoader::Default(userJSON, inboxJSON) }
+{
+}
+
+CascadiaSettings::CascadiaSettings(SettingsLoader&& loader)
+{
+    std::vector<Model::Profile> allProfiles;
+    std::vector<Model::Profile> activeProfiles;
+
+    allProfiles.reserve(loader.userSettings.profiles.size());
+    activeProfiles.reserve(loader.userSettings.profiles.size());
+
+    for (const auto& profile : loader.userSettings.profiles)
+    {
+        allProfiles.emplace_back(*profile);
+        if (!profile->Hidden())
+        {
+            activeProfiles.emplace_back(*profile);
+        }
+    }
+
+    if (allProfiles.empty())
+    {
+        throw SettingsException(SettingsLoadErrors::NoProfiles);
+    }
+    if (activeProfiles.empty())
+    {
+        throw SettingsException(SettingsLoadErrors::AllProfilesHidden);
+    }
+
+    // SettingsLoader and ParsedSettings are supposed
+    // to always create these two members.
+    assert(loader.userSettings.globals != nullptr);
+    assert(loader.userSettings.baseLayerProfile != nullptr);
+
+    _globals = loader.userSettings.globals;
+    _baseLayerProfile = loader.userSettings.baseLayerProfile;
+    _allProfiles = winrt::single_threaded_observable_vector(std::move(allProfiles));
+    _activeProfiles = winrt::single_threaded_observable_vector(std::move(activeProfiles));
+    _warnings = winrt::single_threaded_vector(std::move(loader.warnings));
+
+    _finalizeSettings();
+    _validateSettings();
 }
 
 // Method Description:

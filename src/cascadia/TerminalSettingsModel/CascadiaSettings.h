@@ -60,22 +60,15 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 
     struct SettingsLoader
     {
-        static SettingsLoader Default(const std::string_view& inboxJSON, const std::string_view& userJSON)
-        {
-            SettingsLoader loader{ inboxJSON, userJSON };
-            loader.MergeInboxIntoUserProfiles();
-            return loader;
-        }
-        SettingsLoader(const std::string_view& inboxJSON, const std::string_view& userJSON);
+        static SettingsLoader Default(const std::string_view& userJSON, const std::string_view& inboxJSON);
+        SettingsLoader(const std::string_view& userJSON, const std::string_view& inboxJSON);
 
         void GenerateProfiles();
         void FillBlanksInDefaultsJson();
         void MergeInboxIntoUserProfiles();
         void MergeFragmentsIntoUserProfiles();
         void DisableDeletedProfiles();
-
-        // Called by CascadiaSettings(SettingsLoader&&)
-        void _finalizeLayering();
+        void FinalizeLayering();
 
         ParsedSettings inboxSettings;
         ParsedSettings userSettings;
@@ -111,8 +104,8 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         static winrt::hstring ApplicationVersion();
 
         CascadiaSettings() noexcept = default;
-        CascadiaSettings(const winrt::hstring& inboxJSON, const winrt::hstring& userJSON);
-        CascadiaSettings(const std::string_view& inboxJSON, const std::string_view& userJSON = {});
+        CascadiaSettings(const winrt::hstring& userJSON, const winrt::hstring& inboxJSON);
+        CascadiaSettings(const std::string_view& userJSON, const std::string_view& inboxJSON = {});
         explicit CascadiaSettings(SettingsLoader&& loader);
 
         // user settings
@@ -152,7 +145,6 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         void _finalizeSettings() const;
 
         void _validateSettings();
-        void _validateDefaultProfileExists();
         void _validateAllSchemesExist();
         void _validateMediaResources();
         void _validateKeybindings() const;

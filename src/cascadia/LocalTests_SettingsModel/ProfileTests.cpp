@@ -36,12 +36,6 @@ namespace SettingsModelLocalTests
         TEST_METHOD(LayerProfileIcon);
         TEST_METHOD(LayerProfilesOnArray);
         TEST_METHOD(DuplicateProfileTest);
-
-        TEST_CLASS_SETUP(ClassSetup)
-        {
-            InitializeJsonReader();
-            return true;
-        }
     };
 
     void ProfileTests::LayerProfileProperties()
@@ -181,45 +175,62 @@ namespace SettingsModelLocalTests
 
     void ProfileTests::LayerProfilesOnArray()
     {
-        const auto profile0String{ R"({
-            "name" : "profile0",
-            "guid" : "{6239a42c-0000-49a3-80bd-e8fdd045185c}"
-        }, {
-            "name" : "profile1",
-            "guid" : "{6239a42c-1111-49a3-80bd-e8fdd045185c}"
-        }, {
-            "name" : "profile2",
-            "guid" : "{6239a42c-2222-49a3-80bd-e8fdd045185c}"
+        const auto inboxProfiles{ R"({
+            "profiles": [
+                {
+                    "name" : "profile0",
+                    "guid" : "{6239a42c-0000-49a3-80bd-e8fdd045185c}"
+                }, {
+                    "name" : "profile1",
+                    "guid" : "{6239a42c-1111-49a3-80bd-e8fdd045185c}"
+                }, {
+                    "name" : "profile2",
+                    "guid" : "{6239a42c-2222-49a3-80bd-e8fdd045185c}"
+                }
+            ]
         })" };
-        const auto profile1String{ R"({
-            "name" : "profile3",
-            "guid" : "{6239a42c-0000-49a3-80bd-e8fdd045185c}"
-        }, {
-            "name" : "profile4",
-            "guid" : "{6239a42c-0000-49a3-80bd-e8fdd045185c}"
+        const auto userProfiles{ R"({
+            "profiles": [
+                {
+                    "name" : "profile3",
+                    "guid" : "{6239a42c-0000-49a3-80bd-e8fdd045185c}"
+                }, {
+                    "name" : "profile4",
+                    "guid" : "{6239a42c-1111-49a3-80bd-e8fdd045185c}"
+                }
+            ]
         })" };
 
-        const auto settings = winrt::make_self<implementation::CascadiaSettings>(profile0String, profile1String);
+        const auto settings = winrt::make_self<implementation::CascadiaSettings>(userProfiles, inboxProfiles);
         const auto allProfiles = settings->AllProfiles();
         VERIFY_ARE_EQUAL(3u, allProfiles.Size());
-        VERIFY_ARE_EQUAL(L"profile0", allProfiles.GetAt(0).Name());
-        VERIFY_ARE_EQUAL(L"profile3", allProfiles.GetAt(1).Name());
-        VERIFY_ARE_EQUAL(L"profile4", allProfiles.GetAt(2).Name());
+        VERIFY_ARE_EQUAL(L"profile3", allProfiles.GetAt(0).Name());
+        VERIFY_ARE_EQUAL(L"profile4", allProfiles.GetAt(1).Name());
+        VERIFY_ARE_EQUAL(L"profile2", allProfiles.GetAt(2).Name());
     }
 
     void ProfileTests::DuplicateProfileTest()
     {
-        const auto profile0String{ R"({
-            "name" : "profile0",
-            "backgroundImage" : "some//path"
+        const auto userProfiles{ R"({
+            "profiles": [
+                {
+                    "name": "profile0",
+                    "guid": "{6239a42c-0000-49a3-80bd-e8fdd045185c}",
+                    "backgroundImage": "file:///some/path",
+                    "hidden": false,
+                }
+            ]
         })" };
 
-        const auto settings = winrt::make_self<implementation::CascadiaSettings>(profile0String);
+        //DebugBreak();
+        const auto settings = winrt::make_self<implementation::CascadiaSettings>(userProfiles);
+        VERIFY_ARE_EQUAL(L"file:///some/path", settings->AllProfiles().GetAt(0).DefaultAppearance().BackgroundImagePath());
+
         const auto duplicatedProfile = settings->DuplicateProfile(settings->AllProfiles().GetAt(0));
         duplicatedProfile.Name(L"profile0");
 
-        const auto profile0Json = VerifyParseSucceeded(profile0String);
+        const auto profile0Json = VerifyParseSucceeded(userProfiles);
         const auto duplicatedJson = winrt::get_self<implementation::Profile>(duplicatedProfile)->ToJson();
-        VERIFY_ARE_EQUAL(profile0Json, duplicatedJson);
+        VERIFY_ARE_EQUAL(profile0Json, duplicatedJson, til::u8u16(toString(duplicatedJson)).c_str());
     }
 }

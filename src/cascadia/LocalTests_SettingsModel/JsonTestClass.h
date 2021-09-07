@@ -28,11 +28,11 @@ public:
         _writer = std::unique_ptr<Json::StreamWriter>(Json::StreamWriterBuilder::StreamWriterBuilder().newStreamWriter());
     }
 
-    Json::Value VerifyParseSucceeded(std::string content)
+    Json::Value VerifyParseSucceeded(const std::string_view& content)
     {
         Json::Value root;
         std::string errs;
-        const bool parseResult = _reader->parse(content.c_str(), content.c_str() + content.size(), &root, &errs);
+        const bool parseResult = _reader->parse(content.data(), content.data() + content.size(), &root, &errs);
         VERIFY_IS_TRUE(parseResult, winrt::to_hstring(errs).c_str());
         return root;
     };

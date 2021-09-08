@@ -449,9 +449,12 @@ void SettingsLoader::_parse(const OriginTag origin, const std::string_view& cont
         {
             for (const auto& schemeJson : schemes)
             {
-                if (schemeJson.isObject() && ColorScheme::ValidateColorScheme(schemeJson))
+                if (schemeJson.isObject())
                 {
-                    settings.globals->AddColorScheme(*ColorScheme::FromJson(schemeJson));
+                    if (const auto scheme = ColorScheme::FromJson(schemeJson))
+                    {
+                        settings.globals->AddColorScheme(*scheme);
+                    }
                 }
             }
         }
@@ -482,13 +485,6 @@ void SettingsLoader::_parse(const OriginTag origin, const std::string_view& cont
             {
                 auto profile = Profile::FromJson(profileJson);
                 profile->Origin(origin);
-
-                // Love it.
-                if (!profile->HasGuid())
-                {
-                    profile->Guid(profile->Guid());
-                }
-
                 _appendProfile(std::move(profile), settings);
             }
         }

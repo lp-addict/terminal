@@ -24,21 +24,6 @@ Author(s):
 #include "Profile.h"
 #include "ColorScheme.h"
 
-// fwdecl unittest classes
-namespace SettingsModelLocalTests
-{
-    class SerializationTests;
-    class DeserializationTests;
-    class ProfileTests;
-    class ColorSchemeTests;
-    class KeyBindingsTests;
-};
-namespace TerminalAppUnitTests
-{
-    class DynamicProfileTests;
-    class JsonTests;
-};
-
 namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 {
     winrt::com_ptr<Profile> ReproduceProfile(const winrt::com_ptr<Profile>& parent);
@@ -122,6 +107,8 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         Model::ColorScheme GetColorSchemeForProfile(const Model::Profile& profile) const;
         void UpdateColorSchemeReferences(const winrt::hstring& oldName, const winrt::hstring& newName);
         Model::Profile GetProfileForArgs(const Model::NewTerminalArgs& newTerminalArgs) const;
+        Model::Profile GetProfileByName(const winrt::hstring& name) const;
+        Model::Profile GetProfileByIndex(uint32_t index) const;
         Model::Profile DuplicateProfile(const Model::Profile& source);
 
         // load errors
@@ -139,8 +126,6 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         static const std::filesystem::path& _settingsPath();
 
         winrt::com_ptr<implementation::Profile> _createNewProfile(const std::wstring_view& name) const;
-        std::optional<winrt::guid> _getProfileGuidByName(const winrt::hstring& name) const;
-        std::optional<winrt::guid> _getProfileGuidByIndex(std::optional<int> index) const;
 
         void _finalizeSettings() const;
 
@@ -164,14 +149,6 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
 
         // defterm
         Model::DefaultTerminal _currentDefaultTerminal{ nullptr };
-
-        friend class SettingsModelLocalTests::SerializationTests;
-        friend class SettingsModelLocalTests::DeserializationTests;
-        friend class SettingsModelLocalTests::ProfileTests;
-        friend class SettingsModelLocalTests::ColorSchemeTests;
-        friend class SettingsModelLocalTests::KeyBindingsTests;
-        friend class TerminalAppUnitTests::DynamicProfileTests;
-        friend class TerminalAppUnitTests::JsonTests;
     };
 }
 

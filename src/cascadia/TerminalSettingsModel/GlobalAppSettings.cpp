@@ -72,7 +72,10 @@ void GlobalAppSettings::_FinalizeInheritance()
         _keybindingsWarnings.insert(_keybindingsWarnings.end(), parent->_keybindingsWarnings.begin(), parent->_keybindingsWarnings.end());
         for (const auto& [k, v] : parent->_colorSchemes)
         {
-            _colorSchemes.Insert(k, v);
+            if (!_colorSchemes.HasKey(k))
+            {
+                _colorSchemes.Insert(k, v);
+            }
         }
     }
 }

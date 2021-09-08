@@ -222,15 +222,15 @@ namespace SettingsModelLocalTests
             ]
         })" };
 
-        //DebugBreak();
         const auto settings = winrt::make_self<implementation::CascadiaSettings>(userProfiles);
-        VERIFY_ARE_EQUAL(L"file:///some/path", settings->AllProfiles().GetAt(0).DefaultAppearance().BackgroundImagePath());
+        const auto profile = settings->AllProfiles().GetAt(0);
+        const auto duplicatedProfile = settings->DuplicateProfile(profile);
 
-        const auto duplicatedProfile = settings->DuplicateProfile(settings->AllProfiles().GetAt(0));
-        duplicatedProfile.Name(L"profile0");
+        duplicatedProfile.Guid(profile.Guid());
+        duplicatedProfile.Name(profile.Name());
 
-        const auto profile0Json = VerifyParseSucceeded(userProfiles);
+        const auto json = winrt::get_self<implementation::Profile>(profile)->ToJson();
         const auto duplicatedJson = winrt::get_self<implementation::Profile>(duplicatedProfile)->ToJson();
-        VERIFY_ARE_EQUAL(profile0Json, duplicatedJson, til::u8u16(toString(duplicatedJson)).c_str());
+        VERIFY_ARE_EQUAL(json, duplicatedJson, til::u8u16(toString(duplicatedJson)).c_str());
     }
 }

@@ -109,14 +109,10 @@ Model::Profile CascadiaSettings::FindProfile(const winrt::guid& guid) const noex
 {
     for (const auto& profile : _allProfiles)
     {
-        try
+        if (profile.Guid() == guid)
         {
-            if (profile.Guid() == guid)
-            {
-                return profile;
-            }
+            return profile;
         }
-        CATCH_LOG();
     }
     return nullptr;
 }
@@ -400,9 +396,9 @@ void CascadiaSettings::_finalizeSettings() const
 {
     if (const auto unparsedDefaultProfile = _globals->UnparsedDefaultProfile(); !unparsedDefaultProfile.empty())
     {
-        if (const auto guid = _getProfileGuidByName(unparsedDefaultProfile))
+        if (const auto profile = GetProfileByName(unparsedDefaultProfile))
         {
-            _globals->DefaultProfile(*guid);
+            _globals->DefaultProfile(profile.Guid());
             return;
         }
     }
@@ -424,25 +420,22 @@ void CascadiaSettings::_finalizeSettings() const
 //   we find any such duplicate.
 void CascadiaSettings::_validateAllSchemesExist()
 {
+    const auto colorSchemes = _globals->ColorSchemes();
+
     bool foundInvalidScheme = false;
-    for (auto profile : _allProfiles)
-    {
-        const auto schemeName = profile.DefaultAppearance().ColorSchemeName();
-        if (!_globals->ColorSchemes().HasKey(schemeName))
+    const auto validate = [&](const IAppearanceConfig& appearance) {
+        if (appearance && appearance.HasColorSchemeName() && !colorSchemes.HasKey(appearance.ColorSchemeName()))
         {
             // Clear the user set color scheme. We'll just fallback instead.
-            profile.DefaultAppearance().ClearColorSchemeName();
+            appearance.ClearColorSchemeName();
             foundInvalidScheme = true;
         }
-        if (profile.UnfocusedAppearance())
-        {
-            const auto unfocusedSchemeName = profile.UnfocusedAppearance().ColorSchemeName();
-            if (!_globals->ColorSchemes().HasKey(unfocusedSchemeName))
-            {
-                profile.UnfocusedAppearance().ClearColorSchemeName();
-                foundInvalidScheme = true;
-            }
-        }
+    };
+
+    for (const auto& profile : _allProfiles)
+    {
+        validate(profile.DefaultAppearance());
+        validate(profile.UnfocusedAppearance());
     }
 
     if (foundInvalidScheme)
@@ -469,13 +462,13 @@ void CascadiaSettings::_validateMediaResources()
 
     for (auto profile : _allProfiles)
     {
-        if (!profile.DefaultAppearance().BackgroundImagePath().empty())
+        if (const auto path = profile.DefaultAppearance().ExpandedBackgroundImagePath(); !path.empty())
         {
             // Attempt to convert the path to a URI, the ctor will throw if it's invalid/unparseable.
             // This covers file paths on the machine, app data, URLs, and other resource paths.
             try
             {
-                winrt::Windows::Foundation::Uri imagePath{ profile.DefaultAppearance().ExpandedBackgroundImagePath() };
+                winrt::Windows::Foundation::Uri imagePath{ path };
             }
             catch (...)
             {
@@ -487,13 +480,13 @@ void CascadiaSettings::_validateMediaResources()
 
         if (profile.UnfocusedAppearance())
         {
-            if (!profile.UnfocusedAppearance().BackgroundImagePath().empty())
+            if (const auto path = profile.UnfocusedAppearance().ExpandedBackgroundImagePath(); !path.empty())
             {
                 // Attempt to convert the path to a URI, the ctor will throw if it's invalid/unparseable.
                 // This covers file paths on the machine, app data, URLs, and other resource paths.
                 try
                 {
-                    winrt::Windows::Foundation::Uri imagePath{ profile.UnfocusedAppearance().ExpandedBackgroundImagePath() };
+                    winrt::Windows::Foundation::Uri imagePath{ path };
                 }
                 catch (...)
                 {
@@ -504,23 +497,19 @@ void CascadiaSettings::_validateMediaResources()
             }
         }
 
-        if (!profile.Icon().empty())
+        // Anything longer than 2 wchar_t's _isn't_ an emoji or symbol,
+        // so treat it as an invalid path.
+        if (const auto icon = profile.Icon(); icon.size() > 2)
         {
-            const auto iconPath{ wil::ExpandEnvironmentStringsW<std::wstring>(profile.Icon().c_str()) };
+            const auto iconPath{ wil::ExpandEnvironmentStringsW<std::wstring>(icon.c_str()) };
             try
             {
                 winrt::Windows::Foundation::Uri imagePath{ iconPath };
             }
             catch (...)
             {
-                // Anything longer than 2 wchar_t's _isn't_ an emoji or symbol,
-                // so treat it as an invalid path.
-                if (iconPath.size() > 2)
-                {
-                    // reset icon path
-                    profile.Icon(L"");
-                    invalidIcon = true;
-                }
+                profile.ClearIcon();
+                invalidIcon = true;
             }
         }
     }
@@ -554,25 +543,20 @@ void CascadiaSettings::_validateMediaResources()
 // - the GUID of the profile corresponding to this combination of index and NewTerminalArgs
 Model::Profile CascadiaSettings::GetProfileForArgs(const Model::NewTerminalArgs& newTerminalArgs) const
 {
-    std::optional<winrt::guid> profileByIndex, profileByName;
     if (newTerminalArgs)
     {
-        if (newTerminalArgs.ProfileIndex() != nullptr)
+        if (auto profile = GetProfileByName(newTerminalArgs.Profile()))
         {
-            profileByIndex = _getProfileGuidByIndex(newTerminalArgs.ProfileIndex().Value());
+            return profile;
         }
 
-        profileByName = _getProfileGuidByName(newTerminalArgs.Profile());
-    }
-
-    if (profileByName)
-    {
-        return FindProfile(*profileByName);
-    }
-
-    if (profileByIndex)
-    {
-        return FindProfile(*profileByIndex);
+        if (const auto index = newTerminalArgs.ProfileIndex())
+        {
+            if (auto profile = GetProfileByIndex(gsl::narrow<uint32_t>(index.Value())))
+            {
+                return profile;
+            }
+        }
     }
 
     if constexpr (Feature_ShowProfileDefaultsInSettings::IsEnabled())
@@ -594,13 +578,12 @@ Model::Profile CascadiaSettings::GetProfileForArgs(const Model::NewTerminalArgs&
 }
 
 // Method Description:
-// - Helper to get the GUID of a profile given a name that could be a guid or an actual name.
+// - Helper to get the of a profile given a name that could be a guid or an actual name.
 // Arguments:
 // - name: a guid string _or_ the name of a profile
 // Return Value:
 // - the GUID of the profile corresponding to this name
-std::optional<winrt::guid> CascadiaSettings::_getProfileGuidByName(const winrt::hstring& name) const
-try
+Model::Profile CascadiaSettings::GetProfileByName(const winrt::hstring& name) const
 {
     // First, try and parse the "name" as a GUID. If it's a
     // GUID, and the GUID of one of our profiles, then use that as the
@@ -614,9 +597,9 @@ try
         if (name.size() == 38 && name[0] == L'{')
         {
             const auto newGUID{ Utils::GuidFromString(name.c_str()) };
-            if (FindProfile(newGUID))
+            if (auto profile = FindProfile(newGUID))
             {
-                return newGUID;
+                return profile;
             }
         }
 
@@ -627,21 +610,16 @@ try
         {
             if (profile.Name() == name)
             {
-                return profile.Guid();
+                return profile;
             }
         }
     }
 
-    return std::nullopt;
-}
-catch (...)
-{
-    LOG_CAUGHT_EXCEPTION();
-    return std::nullopt;
+    return nullptr;
 }
 
 // Method Description:
-// - Helper to find the profile GUID for a the profile at the given index in the
+// - Helper to find the profile for a the profile at the given index in the
 //   list of profiles. If no index is provided, this instead returns the default
 //   profile's guid. This is used by the NewTabProfile<N> ShortcutActions to
 //   create a tab for the Nth profile in the list of profiles.
@@ -650,20 +628,9 @@ catch (...)
 //   If omitted, instead return the default profile's GUID
 // Return Value:
 // - the Nth profile's GUID, or the default profile's GUID
-std::optional<winrt::guid> CascadiaSettings::_getProfileGuidByIndex(std::optional<int> index) const
+Model::Profile CascadiaSettings::GetProfileByIndex(uint32_t index) const
 {
-    if (index)
-    {
-        const auto realIndex{ index.value() };
-        // If we don't have that many profiles, then do nothing.
-        if (realIndex >= 0 &&
-            realIndex < gsl::narrow_cast<decltype(realIndex)>(_activeProfiles.Size()))
-        {
-            const auto& selectedProfile = _activeProfiles.GetAt(realIndex);
-            return selectedProfile.Guid();
-        }
-    }
-    return std::nullopt;
+    return index < _activeProfiles.Size() ? _activeProfiles.GetAt(index) : nullptr;
 }
 
 // Method Description:
